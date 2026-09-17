@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Sky Traffic Strike</title>
+<style>
+  :root{
+    --neon-cyan:#00f0ff;
+    --neon-pink:#ff2ed1;
+    --neon-gold:#ffcf4d;
+    --bg-dark:#050510;
+    --panel:#0c0c1e;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  button, .card, .map-card, #pauseBtn{ touch-action:manipulation; }
+  html,body{margin:0;padding:0;width:100%;height:100%;background:var(--bg-dark);overflow:hidden;
+    font-family: 'Segoe UI', Arial, sans-serif; color:#eafcff; user-select:none;}
+  #gameContainer{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  .screen{
+    position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(0,240,255,0.12), transparent 40%),
+      radial-gradient(circle at 80% 80%, rgba(255,46,209,0.12), transparent 40%),
+      linear-gradient(180deg,#05030d 0%, #0b0620 60%, #180a2e 100%);
+    z-index:50; text-align:center; padding:20px; overflow-y:auto;
+  }
+  .hidden{display:none !important;}
+
+  .title{
+    font-size:clamp(28px,6vw,54px); font-weight:900; letter-spacing:3px; margin:6px 0 0 0;
+    background: linear-gradient(90deg,var(--neon-cyan),var(--neon-pink),var(--neon-gold));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow: 0 0 30px rgba(0,240,255,0.35);
+  }
+  .subtitle{opacity:.75; letter-spacing:4px; font-size:12px; margin-bottom:22px; text-transform:uppercase;}
+
+  .panel{
+    background:linear-gradient(180deg, rgba(20,18,45,0.85), rgba(10,9,25,0.9));
+    border:1px solid rgba(0,240,255,0.25); border-radius:16px; padding:18px;
+    box-shadow:0 0 40px rgba(0,240,255,0.08) inset, 0 10px 30px rgba(0,0,0,0.5);
+    max-width:960px; width:100%;
+  }
+
+  .grid-cars{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-top:14px;}
+  .grid-maps{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:14px; margin-top:14px;}
+
+  .card{
+    background:rgba(255,255,255,0.03); border:2px solid rgba(255,255,255,0.08); border-radius:12px;
+    padding:12px 10px; cursor:pointer; transition:.15s; position:relative;
+  }
+  .card:hover{ transform:translateY(-3px); border-color:rgba(0,240,255,0.5); box-shadow:0 6px 18px rgba(0,240,255,0.15);}
+  .card.selected{ border-color:var(--neon-gold); box-shadow:0 0 22px rgba(255,207,77,0.35); background:rgba(255,207,77,0.06);}
+  .swatch{ width:100%; height:54px; border-radius:8px; margin-bottom:8px; position:relative; overflow:hidden;}
+  .card h3{ margin:4px 0 2px; font-size:14px;}
+  .card .stats{ font-size:10px; opacity:.75; line-height:1.5; text-align:left; margin-top:6px;}
+  .bar{ height:5px; background:rgba(255,255,255,0.08); border-radius:3px; overflow:hidden; margin:2px 0;}
+  .bar > i{ display:block; height:100%; background:linear-gradient(90deg,var(--neon-cyan),var(--neon-pink)); }
+
+  .map-card{ background:rgba(255,255,255,0.03); border:2px solid rgba(255,255,255,0.08); border-radius:14px; overflow:hidden; cursor:pointer; transition:.15s;}
+  .map-card:hover{ transform:translateY(-3px); border-color:rgba(0,240,255,0.5);}
+  .map-card.selected{ border-color:var(--neon-gold); box-shadow:0 0 22px rgba(255,207,77,0.35);}
+  .map-preview{ height:100px; }
+  .map-card h3{ margin:8px 10px 2px;}
+  .map-card p{ margin:0 10px 10px; font-size:11px; opacity:.7;}
+
+  button.primary{
+    margin-top:20px; padding:14px 40px; font-size:16px; font-weight:800; letter-spacing:2px;
+    border:none; border-radius:30px; cursor:pointer; color:#04040a; text-transform:uppercase;
+    background:linear-gradient(90deg,var(--neon-cyan),var(--neon-gold));
+    box-shadow:0 8px 24px rgba(0,240,255,0.3); transition:.15s;
+  }
+  button.primary:disabled{ opacity:.35; cursor:not-allowed; box-shadow:none;}
+  button.primary:not(:disabled):hover{ transform:translateY(-2px) scale(1.03); }
+  button.ghost{
+    margin-top:12px; padding:10px 26px; font-size:13px; border-radius:24px; cursor:pointer;
+    background:transparent; border:1px solid rgba(255,255,255,0.3); color:#eafcff; letter-spacing:1px;
+  }
+  button.ghost:hover{ border-color:var(--neon-cyan); color:var(--neon-cyan);}
+
+  /* HUD */
+  #hud{ position:fixed; inset:0; pointer-events:none; z-index:20; font-variant-numeric:tabular-nums;}
+  .hud-top{ position:absolute; top:14px; left:14px; right:14px; display:flex; justify-content:space-between; align-items:flex-start;}
+  .hud-box{ background:rgba(5,5,16,0.55); border:1px solid rgba(0,240,255,0.25); border-radius:10px; padding:8px 14px; backdrop-filter:blur(4px);}
+  .health-wrap{ width:220px;}
+  .label-row{ display:flex; justify-content:space-between; font-size:11px; opacity:.85; margin-bottom:3px;}
+  .hbar{ height:10px; border-radius:6px; background:rgba(255,255,255,0.08); overflow:hidden; border:1px solid rgba(255,255,255,0.1);}
+  .hbar > i{ display:block; height:100%; background:linear-gradient(90deg,#ff3355,#ff9a3d); transition:width .2s;}
+  .level-badge{ font-size:22px; font-weight:900; color:var(--neon-gold); text-shadow:0 0 12px rgba(255,207,77,0.6);}
+  .score-val{ font-size:18px; font-weight:800; color:var(--neon-cyan);}
+  .enemies-left{ font-size:12px; opacity:.8; margin-top:4px;}
+
+  #crosshair{
+    position:fixed; left:50%; top:44%; width:34px; height:34px; margin-left:-17px; margin-top:-17px; z-index:22; pointer-events:none;
+    border:2px solid rgba(0,240,255,0.7); border-radius:50%; box-shadow:0 0 14px rgba(0,240,255,0.45);
+    transition: border-color .12s, box-shadow .12s, transform .12s;
+  }
+  #crosshair::before, #crosshair::after{
+    content:''; position:absolute; background:rgba(0,240,255,0.9);
+  }
+  #crosshair::before{ left:50%; top:-8px; width:2px; height:8px; margin-left:-1px;}
+  #crosshair::after{ left:-8px; top:50%; width:8px; height:2px; margin-top:-1px;}
+  #crosshair.locked{
+    border-color:#7CFF6B; box-shadow:0 0 22px rgba(124,255,107,0.85); transform:scale(1.2);
+  }
+  #crosshair.locked::before, #crosshair.locked::after{ background:#7CFF6B; }
+
+  /* lane D-pad */
+  #laneDpad{ position:absolute; bottom:16px; right:16px; display:grid; grid-template-columns:52px 52px 52px; grid-template-rows:52px 52px 52px; gap:6px; pointer-events:auto; z-index:23; touch-action:none;}
+  .dbtn{ display:flex; align-items:center; justify-content:center; background:rgba(5,5,16,0.6); border:1px solid rgba(0,240,255,0.35); border-radius:10px; font-size:20px; color:var(--neon-cyan); cursor:pointer; user-select:none; touch-action:none;}
+  .dbtn:active{ background:rgba(0,240,255,0.25); transform:scale(0.95);}
+  .dbtn.up{grid-column:2; grid-row:1;}
+  .dbtn.left{grid-column:1; grid-row:2;}
+  .dbtn.right{grid-column:3; grid-row:2;}
+  .dbtn.down{grid-column:2; grid-row:3;}
+
+  /* mobile fire button */
+  #fireBtn{
+    position:absolute; bottom:26px; left:20px; width:78px; height:78px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, rgba(255,110,60,0.9), rgba(120,10,10,0.85));
+    border:2px solid rgba(255,207,77,0.7); box-shadow:0 0 18px rgba(255,111,60,0.55), 0 4px 12px rgba(0,0,0,0.5);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-size:24px; color:#fff; letter-spacing:1px; pointer-events:auto; z-index:23;
+    user-select:none; cursor:pointer; touch-action:none;
+  }
+  #fireBtn span{ font-size:9px; font-weight:800; margin-top:2px; opacity:.9;}
+  #fireBtn:active{ transform:scale(0.92); box-shadow:0 0 26px rgba(255,111,60,0.85), 0 4px 12px rgba(0,0,0,0.5);}
+  @media (min-width:900px) and (pointer:fine){
+    #fireBtn{ display:none; } /* di desktop dengan mouse, tembakan otomatis + spasi sudah cukup */
+  }
+
+  .boss-hud{ position:absolute; top:14px; left:50%; transform:translateX(-50%); width:min(520px,80vw); text-align:center;}
+  .boss-name{ font-size:13px; letter-spacing:3px; color:var(--neon-pink); text-shadow:0 0 10px rgba(255,46,209,0.7); margin-bottom:4px;}
+  .boss-bar{ height:14px; border-radius:8px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,46,209,0.4); overflow:hidden;}
+  .boss-bar > i{ display:block; height:100%; background:linear-gradient(90deg,#ff2ed1,#ff3355);}
+
+  .controls-hint{ position:absolute; bottom:14px; left:14px; font-size:11px; opacity:.6; background:rgba(5,5,16,0.5); padding:6px 10px; border-radius:8px;}
+  .msg-center{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center;
+    font-size:clamp(20px,4vw,34px); font-weight:900; letter-spacing:4px; opacity:0; transition:opacity .3s, transform .3s;
+    text-shadow:0 0 20px rgba(0,240,255,0.6);
+  }
+  .msg-center.show{ opacity:1; transform:translate(-50%,-50%) scale(1.05);}
+
+  #pauseBtn{ position:absolute; top:14px; right:14px; pointer-events:auto; cursor:pointer; }
+
+  @media (max-width:640px){
+    .health-wrap{width:140px;}
+    .hud-box{padding:6px 10px;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ MAIN MENU ============ -->
+<div id="mainMenu" class="screen">
+  <h1 class="title">SKY TRAFFIC STRIKE</h1>
+  <div class="subtitle">Car Fly Shooter · Three.js</div>
+  <div class="panel">
+    <p style="opacity:.85;font-size:13px;line-height:1.6;">
+      Terbangkan mobilmu, tembak jatuh lalu lintas mobil terbang yang melintas di langit kota,
+      naik level dari 1 sampai 20, dan hadapi <b style="color:var(--neon-pink)">BOSS raksasa</b> di level 20!
+    </p>
+    <button class="primary" id="playBtn">Mulai Bermain</button>
+  </div>
+</div>
+
+<!-- ============ CAR SELECT ============ -->
+<div id="carSelect" class="screen hidden">
+  <h1 class="title" style="font-size:clamp(20px,4vw,32px);">Pilih Mobil Terbangmu</h1>
+  <div class="subtitle">10 Kendaraan Tersedia</div>
+  <div class="panel">
+    <div class="grid-cars" id="carGrid"></div>
+    <button class="primary" id="toMapBtn" disabled>Lanjut Pilih Kota →</button>
+  </div>
+</div>
+
+<!-- ============ MAP SELECT ============ -->
+<div id="mapSelect" class="screen hidden">
+  <h1 class="title" style="font-size:clamp(20px,4vw,32px);">Pilih Kota</h1>
+  <div class="subtitle">Lokasi Pertempuran</div>
+  <div class="panel">
+    <div class="grid-maps" id="mapGrid"></div>
+    <button class="primary" id="startGameBtn" disabled>Mulai Misi Level 1 →</button>
+    <div><button class="ghost" id="backToCarBtn">← Kembali Pilih Mobil</button></div>
+  </div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div id="gameContainer" class="hidden">
+  <div id="hud">
+    <div class="hud-top">
+      <div class="hud-box">
+        <div class="level-badge" id="hudLevel">LV 1</div>
+        <div class="enemies-left" id="hudEnemies">Traffic: 0 / 0</div>
+      </div>
+      <div class="hud-box health-wrap">
+        <div class="label-row"><span>ARMOR</span><span id="hudHpText">100/100</span></div>
+        <div class="hbar"><i id="hudHpBar" style="width:100%"></i></div>
+        <div class="label-row" style="margin-top:6px;"><span>SKOR</span><span class="score-val" id="hudScore">0</span></div>
+      </div>
+    </div>
+    <div class="boss-hud hidden" id="bossHud">
+      <div class="boss-name" id="bossName">GIANT AERIAL BOSS</div>
+      <div class="boss-bar"><i id="bossBar" style="width:100%"></i></div>
+    </div>
+    <div class="controls-hint">A/D atau ←/→: ganti lajur &nbsp;|&nbsp; W/S atau ↑/↓: naik-turun lajur &nbsp;|&nbsp; Tembak OTOMATIS saat sejajar NPC &nbsp;|&nbsp; Spasi: tembak manual &nbsp;|&nbsp; P: jeda</div>
+    <div class="msg-center" id="centerMsg"></div>
+    <div id="pauseBtn" class="hud-box" style="pointer-events:auto;">⏸</div>
+    <div id="laneDpad">
+      <div class="dbtn up" id="btnUp">▲</div>
+      <div class="dbtn left" id="btnLeft">◀</div>
+      <div class="dbtn right" id="btnRight">▶</div>
+      <div class="dbtn down" id="btnDown">▼</div>
+    </div>
+    <div id="fireBtn">🔥<span>TEMBAK</span></div>
+  </div>
+  <div id="crosshair"></div>
+</div>
+
+<!-- ============ PAUSE ============ -->
+<div id="pauseScreen" class="screen hidden">
+  <h1 class="title" style="font-size:32px;">JEDA</h1>
+  <div class="panel" style="max-width:320px;">
+    <button class="primary" id="resumeBtn">Lanjutkan</button>
+    <div><button class="ghost" id="quitBtn">Keluar ke Menu</button></div>
+  </div>
+</div>
+
+<!-- ============ GAME OVER ============ -->
+<div id="gameOverScreen" class="screen hidden">
+  <h1 class="title" style="color:#ff3355;-webkit-text-fill-color:#ff3355;">MOBIL HANCUR</h1>
+  <div class="panel" style="max-width:400px;">
+    <p>Kamu bertahan sampai Level <b id="overLevel">1</b></p>
+    <p>Skor Akhir: <b id="overScore" style="color:var(--neon-gold);font-size:22px;">0</b></p>
+    <button class="primary" id="retryBtn">Coba Lagi</button>
+    <div><button class="ghost" id="overMenuBtn">Menu Utama</button></div>
+  </div>
+</div>
+
+<!-- ============ VICTORY ============ -->
+<div id="victoryScreen" class="screen hidden">
+  <h1 class="title">MISI SELESAI!</h1>
+  <div class="panel" style="max-width:420px;">
+    <p>Boss raksasa berhasil dijatuhkan! Kota aman kembali.</p>
+    <p>Skor Akhir: <b id="winScore" style="color:var(--neon-gold);font-size:24px;">0</b></p>
+    <button class="primary" id="playAgainBtn">Main Lagi</button>
+    <div><button class="ghost" id="winMenuBtn">Menu Utama</button></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* ============================================================
+   SKY TRAFFIC STRIKE — car fly shooter (Three.js)
+   ============================================================ */
+
+// ---------- DATA: 10 CAR TYPES ----------
+const CAR_TYPES = [
+  { id:0, name:"Falcon Zephyr",  style:"sport",    color:0xff3b3b, accent:0xffffff, glow:0xff5b3b, speed:1.15, fireRate:220, maxHealth:80,  damage:1, desc:"Cepat, ringan" },
+  { id:1, name:"Titan Hauler",   style:"truck",    color:0xf2c14e, accent:0x333333, glow:0xffcf4d, speed:0.75, fireRate:340, maxHealth:170, damage:1, desc:"Tangguh, lambat" },
+  { id:2, name:"Vegas Viper",    style:"muscle",   color:0x9b30ff, accent:0x00f0ff, glow:0xd000ff, speed:1.05, fireRate:260, maxHealth:100, damage:1, desc:"Seimbang, gaya" },
+  { id:3, name:"Andes Condor",   style:"suv",      color:0xe8e8e8, accent:0x2a2a2a, glow:0x66ffcc, speed:0.9,  fireRate:300, maxHealth:130, damage:1, desc:"Kokoh serba guna" },
+  { id:4, name:"Neon Phantom",   style:"stealth",  color:0x111318, accent:0x00f0ff, glow:0x00f0ff, speed:1.0,  fireRate:150, maxHealth:75,  damage:1, desc:"Tembakan cepat" },
+  { id:5, name:"Sunset Cruiser", style:"muscle",   color:0xff8a3d, accent:0xfff3c4, glow:0xffb84d, speed:1.0,  fireRate:280, maxHealth:105, damage:1, desc:"Serbaguna" },
+  { id:6, name:"Salt Racer",     style:"metallic", color:0xd8d8e0, accent:0x00f0ff, glow:0xbfefff, speed:1.3,  fireRate:260, maxHealth:70,  damage:1, desc:"Tercepat" },
+  { id:7, name:"City Hopper",    style:"taxi",     color:0xffd400, accent:0x111111, glow:0xffe680, speed:0.95, fireRate:300, maxHealth:95,  damage:1, desc:"Starter seimbang" },
+  { id:8, name:"Obsidian Reaper",style:"aggressive",color:0x1a0505, accent:0xff2ed1, glow:0xff2ed1, speed:1.05,fireRate:200, maxHealth:110, damage:1.3, desc:"Serangan kuat" },
+  { id:9, name:"Golden Eagle",   style:"luxury",   color:0xd4af37, accent:0xffffff, glow:0xffe08a, speed:1.05, fireRate:190, maxHealth:150, damage:1.25, desc:"Terkuat overall" },
+];
+
+// ---------- DATA: 3 MAPS ----------
+const MAPS = [
+  { id:0, name:"Los Angeles", desc:"Senja jingga di antara gedung kaca", sky:0xff8952, sky2:0x2a1b5e, ground:0x3a3550, fog:0xff9d6b,
+    buildingColors:[0x2b3a55,0x3d4f77,0x233150,0x4a5b8a], buildingStyle:"glass", ambientColor:0xffb37a },
+  { id:1, name:"Bolivia (Salt Flat)", desc:"Dataran garam Uyuni yang luas", sky:0xbfe3ff, sky2:0xffffff, ground:0xf3f2ee, fog:0xdfeeff,
+    buildingColors:[0x8a6a52,0x9c7b5e,0x7a5a44,0xb08968], buildingStyle:"mesa", ambientColor:0xffffff },
+  { id:2, name:"Las Vegas", desc:"Kota neon yang tak pernah tidur", sky:0x0a0a2a, sky2:0x1a0630, ground:0x0a0a12, fog:0x1a0a2a,
+    buildingColors:[0xff2ed1,0x00f0ff,0xffcf4d,0x7d2eff], buildingStyle:"neon", ambientColor:0x6a4dff },
+];
+
+// ---------- STATE ----------
+let state = {
+  car:null, map:null, level:1, score:0, hp:100, maxHp:100,
+  enemiesTotal:0, enemiesSpawned:0, enemiesDestroyed:0, enemiesEscaped:0,
+  maxConcurrent:5, spawnTimer:0, spawnInterval:1.2,
+  paused:false, running:false, bossActive:false, forwardSpeed:26,
+};
+
+// lane grid — mobil player & NPC sama-sama bergerak mengikuti lajur ini
+const LANES_X = [-16,-8,0,8,16];
+const LANES_Y = [12,20,28];
+let laneXIndex = 2, laneYIndex = 1;
+let laneChangeCooldown = 0;
+
+let scene, camera, renderer, clock;
+let playerShip;
+let projectiles = [], enemyProjectiles = [];
+let enemies = [], boss = null;
+let buildingPool = [], laneMarkers = [];
+let lastShotTime = 0;
+let engineLights = [];
+const RECYCLE_AHEAD = -260;   // titik spawn ulang objek yang sudah lewat kamera
+const RECYCLE_BEHIND = 40;    // batas di belakang kamera untuk daur ulang
+
+// ============================================================
+// UI: BUILD CAR SELECT CARDS
+// ============================================================
+const carGrid = document.getElementById('carGrid');
+CAR_TYPES.forEach(car=>{
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="swatch" style="background:linear-gradient(135deg, #${car.color.toString(16).padStart(6,'0')}, #${car.glow.toString(16).padStart(6,'0')})"></div>
+    <h3>${car.name}</h3>
+    <div style="font-size:10px;opacity:.65;">${car.desc}</div>
+    <div class="stats">
+      Speed <div class="bar"><i style="width:${car.speed/1.3*100}%"></i></div>
+      Armor <div class="bar"><i style="width:${car.maxHealth/170*100}%"></i></div>
+      Rate &nbsp;<div class="bar"><i style="width:${(1 - (car.fireRate-150)/(340-150))*100}%"></i></div>
+    </div>
+  `;
+  card.onclick = ()=>{
+    document.querySelectorAll('#carGrid .card').forEach(c=>c.classList.remove('selected'));
+    card.classList.add('selected');
+    state.car = car;
+    document.getElementById('toMapBtn').disabled = false;
+  };
+  carGrid.appendChild(card);
+});
+
+// ============================================================
+// UI: BUILD MAP SELECT CARDS
+// ============================================================
+const mapGrid = document.getElementById('mapGrid');
+MAPS.forEach(map=>{
+  const card = document.createElement('div');
+  card.className = 'map-card';
+  const c1 = '#'+map.sky.toString(16).padStart(6,'0');
+  const c2 = '#'+map.sky2.toString(16).padStart(6,'0');
+  const cg = '#'+map.ground.toString(16).padStart(6,'0');
+  card.innerHTML = `
+    <div class="map-preview" style="background:linear-gradient(180deg, ${c1}, ${c2} 60%, ${cg} 100%);"></div>
+    <h3>${map.name}</h3>
+    <p>${map.desc}</p>
+  `;
+  card.onclick = ()=>{
+    document.querySelectorAll('#mapGrid .map-card').forEach(c=>c.classList.remove('selected'));
+    card.classList.add('selected');
+    state.map = map;
+    document.getElementById('startGameBtn').disabled = false;
+  };
+  mapGrid.appendChild(card);
+});
+
+// ============================================================
+// SCREEN NAVIGATION
+// ============================================================
+function show(id){
+  ['mainMenu','carSelect','mapSelect','gameContainer','pauseScreen','gameOverScreen','victoryScreen']
+    .forEach(s=>document.getElementById(s).classList.toggle('hidden', s!==id));
+}
+document.getElementById('playBtn').onclick = ()=> show('carSelect');
+document.getElementById('toMapBtn').onclick = ()=> show('mapSelect');
+document.getElementById('backToCarBtn').onclick = ()=> show('carSelect');
+document.getElementById('startGameBtn').onclick = ()=> beginGame();
+document.getElementById('resumeBtn').onclick = ()=> togglePause(false);
+document.getElementById('quitBtn').onclick = ()=> { togglePause(false); endToMenu(); };
+document.getElementById('retryBtn').onclick = ()=> beginGame();
+document.getElementById('overMenuBtn').onclick = ()=> endToMenu();
+document.getElementById('playAgainBtn').onclick = ()=> beginGame();
+document.getElementById('winMenuBtn').onclick = ()=> endToMenu();
+document.getElementById('pauseBtn').onclick = ()=> togglePause(true);
+
+function endToMenu(){
+  state.running = false;
+  cleanupScene();
+  show('mainMenu');
+}
+
+// ============================================================
+// GAME BOOTSTRAP
+// ============================================================
+function beginGame(){
+  state.level = 1;
+  state.score = 0;
+  state.hp = state.car.maxHealth;
+  state.maxHp = state.car.maxHealth;
+  state.bossActive = false;
+  show('gameContainer');
+  cleanupScene();
+  initScene();
+  startLevel(state.level);
+  state.running = true;
+  clock = new THREE.Clock();
+  animate();
+}
+
+function cleanupScene(){
+  if(renderer){
+    renderer.dispose();
+    const c = renderer.domElement;
+    if(c && c.parentNode) c.parentNode.removeChild(c);
+  }
+  scene = null; enemies=[]; projectiles=[]; enemyProjectiles=[]; boss=null; engineLights=[];
+  buildingPool=[]; laneMarkers=[];
+}
+
+// ============================================================
+// SCENE SETUP
+// ============================================================
+function initScene(){
+  const map = state.map;
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(map.sky);
+  scene.fog = new THREE.Fog(map.fog, 60, 220);
+
+  camera = new THREE.PerspectiveCamera(65, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 24, 30);
+
+  renderer = new THREE.WebGLRenderer({ antialias:true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  document.getElementById('gameContainer').appendChild(renderer.domElement);
+  renderer.domElement.style.position='fixed';
+  renderer.domElement.style.inset='0';
+  renderer.domElement.style.zIndex='0';
+
+  // lights
+  const ambient = new THREE.AmbientLight(map.ambientColor, 0.55);
+  scene.add(ambient);
+  const sun = new THREE.DirectionalLight(0xffffff, map.buildingStyle==='neon'?0.4:0.9);
+  sun.position.set(60,80,40);
+  scene.add(sun);
+  const hemi = new THREE.HemisphereLight(map.sky, map.ground, 0.5);
+  scene.add(hemi);
+
+  // ground
+  const groundGeo = new THREE.PlaneGeometry(1000,1000);
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: map.ground,
+    metalness: map.buildingStyle==='mesa'?0.3:0.1,
+    roughness: map.buildingStyle==='mesa'?0.2:0.85,
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI/2;
+  ground.position.y = -2;
+  scene.add(ground);
+
+  if(map.buildingStyle==='neon'){
+    // grid lines for vegas
+    const grid = new THREE.GridHelper(600, 60, 0x00f0ff, 0x330033);
+    grid.position.y = -1.98;
+    grid.material.opacity = 0.25;
+    grid.material.transparent = true;
+    scene.add(grid);
+    addStars();
+  }
+
+  buildEnvironment(map);
+  buildPlayer(state.car);
+}
+
+function addStars(){
+  const geo = new THREE.BufferGeometry();
+  const cnt = 500;
+  const pos = new Float32Array(cnt*3);
+  for(let i=0;i<cnt;i++){
+    pos[i*3] = (Math.random()-0.5)*500;
+    pos[i*3+1] = Math.random()*150+30;
+    pos[i*3+2] = (Math.random()-0.5)*500;
+  }
+  geo.setAttribute('position', new THREE.BufferAttribute(pos,3));
+  const mat = new THREE.PointsMaterial({color:0xffffff, size:1.2, transparent:true, opacity:0.8});
+  scene.add(new THREE.Points(geo,mat));
+}
+
+function buildEnvironment(map){
+  buildingPool = [];
+  const group = new THREE.Group();
+  const count = map.buildingStyle==='mesa' ? 40 : 90;
+  for(let i=0;i<count;i++){
+    const side = Math.random()<0.5?-1:1;
+    const x = side*(24 + Math.random()*140);
+    const z = -Math.random()*320;
+    let w,h,d,color,mesh;
+    color = map.buildingColors[Math.floor(Math.random()*map.buildingColors.length)];
+
+    if(map.buildingStyle==='mesa'){
+      w = 6+Math.random()*14; h = 8+Math.random()*30; d = 6+Math.random()*14;
+      const geo = new THREE.ConeGeometry(w*0.6, h, 5);
+      const mat = new THREE.MeshStandardMaterial({color, roughness:0.95, metalness:0.05});
+      mesh = new THREE.Mesh(geo, mat);
+    } else {
+      w = 5+Math.random()*10; h = 15+Math.random()*(map.buildingStyle==='neon'?45:70); d = 5+Math.random()*10;
+      const geo = new THREE.BoxGeometry(w,h,d);
+      const emissive = map.buildingStyle==='neon' ? color : 0x000000;
+      const mat = new THREE.MeshStandardMaterial({
+        color: map.buildingStyle==='glass'? color : color,
+        metalness: map.buildingStyle==='glass'?0.6:0.2,
+        roughness: map.buildingStyle==='glass'?0.25:0.7,
+        emissive: emissive,
+        emissiveIntensity: map.buildingStyle==='neon'?0.6:0
+      });
+      mesh = new THREE.Mesh(geo, mat);
+      if(map.buildingStyle==='neon' && Math.random()<0.5){
+        const stripGeo = new THREE.BoxGeometry(w*1.02, 1, d*1.02);
+        const stripMat = new THREE.MeshBasicMaterial({color: map.buildingColors[Math.floor(Math.random()*map.buildingColors.length)]});
+        for(let s=0;s<3;s++){
+          const strip = new THREE.Mesh(stripGeo, stripMat);
+          strip.position.y = -h/2 + (h/4)*(s+1);
+          mesh.add(strip);
+        }
+      }
+    }
+    mesh.position.set(x, h/2 - 2, z);
+    group.add(mesh);
+    buildingPool.push(mesh);
+  }
+  scene.add(group);
+  buildLaneMarkers();
+}
+
+function buildLaneMarkers(){
+  laneMarkers = [];
+  const group = new THREE.Group();
+  const markerMat = new THREE.MeshBasicMaterial({color:0x66e0ff, transparent:true, opacity:0.55});
+  LANES_X.forEach(lx=>{
+    for(let z=-300; z<40; z+=18){
+      const m = new THREE.Mesh(new THREE.BoxGeometry(0.6,0.3,4), markerMat);
+      m.position.set(lx, -1.85, z);
+      group.add(m);
+      laneMarkers.push(m);
+    }
+  });
+  scene.add(group);
+}
+
+// ============================================================
+// VEHICLE BUILDER (10 player styles)
+// ============================================================
+function makeMat(color, opts={}){
+  return new THREE.MeshStandardMaterial(Object.assign({color, metalness:0.4, roughness:0.4}, opts));
+}
+
+function buildVehicle(carDef, scale=1){
+  const g = new THREE.Group();
+  const bodyMat = makeMat(carDef.color, {
+    metalness: carDef.style==='metallic'?0.9:0.5,
+    roughness: carDef.style==='metallic'?0.15:0.45,
+  });
+  const accentMat = makeMat(carDef.accent, {metalness:0.6, roughness:0.3});
+  const glassMat = new THREE.MeshStandardMaterial({color:0x0a1a2a, metalness:0.9, roughness:0.1, transparent:true, opacity:0.75});
+  const glowMat = new THREE.MeshBasicMaterial({color:carDef.glow});
+
+  let bodyW=3.2, bodyH=1.0, bodyD=5.4;
+
+  switch(carDef.style){
+    case 'truck': bodyW=3.6; bodyH=1.5; bodyD=6.2; break;
+    case 'suv': bodyW=3.4; bodyH=1.4; bodyD=5.6; break;
+    case 'muscle': bodyW=3.0; bodyH=0.9; bodyD=5.8; break;
+    case 'stealth': bodyW=3.6; bodyH=0.7; bodyD=5.4; break;
+    case 'taxi': bodyW=3.2; bodyH=1.2; bodyD=5.4; break;
+    case 'aggressive': bodyW=3.0; bodyH=0.9; bodyD=5.6; break;
+    case 'luxury': bodyW=3.6; bodyH=1.1; bodyD=6.0; break;
+    default: bodyW=3.0; bodyH=0.85; bodyD=5.2; // sport / metallic
+  }
+
+  // main body
+  const body = new THREE.Mesh(new THREE.BoxGeometry(bodyW,bodyH,bodyD,2,2,2), bodyMat);
+  g.add(body);
+
+  // nose wedge
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(bodyW*0.5, bodyD*0.35, 4), bodyMat);
+  nose.rotation.x = Math.PI/2;
+  nose.rotation.y = Math.PI/4;
+  nose.scale.set(1, 0.55, 1);
+  nose.position.set(0, bodyH*0.05, -bodyD/2 - bodyD*0.15);
+  g.add(nose);
+
+  // cockpit
+  const cockpitGeo = carDef.style==='stealth' ? new THREE.BoxGeometry(bodyW*0.7, bodyH*0.6, bodyD*0.35)
+                     : new THREE.SphereGeometry(bodyW*0.42, 8, 6, 0, Math.PI*2, 0, Math.PI*0.55);
+  const cockpit = new THREE.Mesh(cockpitGeo, glassMat);
+  cockpit.position.set(0, bodyH*0.55, -bodyD*0.05);
+  g.add(cockpit);
+
+  // side fins/wings
+  const finGeo = new THREE.BoxGeometry(bodyW*0.25, 0.18, bodyD*0.7);
+  const finL = new THREE.Mesh(finGeo, accentMat);
+  finL.position.set(-bodyW*0.62, -bodyH*0.1, 0.3);
+  const finR = finL.clone(); finR.position.x *= -1;
+  g.add(finL, finR);
+
+  // style-specific extras
+  if(carDef.style==='truck' || carDef.style==='suv'){
+    const rack = new THREE.Mesh(new THREE.BoxGeometry(bodyW*0.85,0.15,bodyD*0.5), accentMat);
+    rack.position.set(0, bodyH*0.7, 0.3);
+    g.add(rack);
+  }
+  if(carDef.style==='taxi'){
+    const stripe = new THREE.Mesh(new THREE.BoxGeometry(bodyW*1.02, bodyH*0.25, bodyD*1.02), new THREE.MeshBasicMaterial({color:0x111111}));
+    stripe.position.y = 0;
+    g.add(stripe);
+    const sign = new THREE.Mesh(new THREE.BoxGeometry(0.8,0.4,1.2), glowMat);
+    sign.position.set(0, bodyH*0.75, 0);
+    g.add(sign);
+  }
+  if(carDef.style==='aggressive'){
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(0.35,1.4,4), accentMat);
+    spike.position.set(0, bodyH*0.7, -bodyD*0.1);
+    g.add(spike);
+  }
+  if(carDef.style==='luxury'){
+    const trim = new THREE.Mesh(new THREE.TorusGeometry(bodyW*0.5, 0.06, 6, 12), accentMat);
+    trim.rotation.x = Math.PI/2;
+    trim.position.set(0, 0, bodyD/2 - 0.2);
+    g.add(trim);
+  }
+
+  // spoiler (rear wing) for sport/muscle/aggressive
+  if(['sport','muscle','aggressive','metallic'].includes(carDef.style)){
+    const spoilerStand1 = new THREE.Mesh(new THREE.BoxGeometry(0.15,0.5,0.15), accentMat);
+    spoilerStand1.position.set(-bodyW*0.35, bodyH*0.55, bodyD/2 - 0.3);
+    const spoilerStand2 = spoilerStand1.clone(); spoilerStand2.position.x *= -1;
+    const spoilerWing = new THREE.Mesh(new THREE.BoxGeometry(bodyW*0.9,0.1,0.8), accentMat);
+    spoilerWing.position.set(0, bodyH*0.8, bodyD/2 - 0.3);
+    g.add(spoilerStand1, spoilerStand2, spoilerWing);
+  }
+
+  // thrusters / engine glow (rear)
+  const thrusterGeo = new THREE.SphereGeometry(0.32, 8, 8);
+  const thrusterPositions = [[-bodyW*0.35, -bodyH*0.1, bodyD/2],[bodyW*0.35, -bodyH*0.1, bodyD/2]];
+  thrusterPositions.forEach(p=>{
+    const th = new THREE.Mesh(thrusterGeo, glowMat);
+    th.position.set(p[0],p[1],p[2]);
+    g.add(th);
+  });
+
+  g.scale.setScalar(scale);
+  g.userData.carDef = carDef;
+  return g;
+}
+
+function buildPlayer(carDef){
+  laneXIndex = 2; laneYIndex = 1;
+  playerShip = buildVehicle(carDef, 1);
+  playerShip.position.set(LANES_X[laneXIndex], LANES_Y[laneYIndex], 0);
+  scene.add(playerShip);
+  const light = new THREE.PointLight(carDef.glow, 1.2, 20);
+  light.position.set(0,0,3);
+  playerShip.add(light);
+}
+
+function buildTrafficCar(){
+  // generic simple traffic car (varied hue)
+  const hue = Math.random();
+  const color = new THREE.Color().setHSL(hue, 0.6, 0.55).getHex();
+  const g = new THREE.Group();
+  const bodyMat = makeMat(color, {metalness:0.4, roughness:0.5});
+  const body = new THREE.Mesh(new THREE.BoxGeometry(2.6,0.8,4.4), bodyMat);
+  g.add(body);
+  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.8,0.6,2.2), new THREE.MeshStandardMaterial({color:0x0a1a2a, metalness:0.8, roughness:0.2}));
+  cabin.position.y = 0.6;
+  g.add(cabin);
+  const glow = new THREE.Mesh(new THREE.SphereGeometry(0.22,6,6), new THREE.MeshBasicMaterial({color:0x66e0ff}));
+  glow.position.set(0,-0.1,2.2);
+  g.add(glow);
+  return g;
+}
+
+function buildBoss(){
+  const g = new THREE.Group();
+  const bodyMat = makeMat(0x3a0a0a, {metalness:0.7, roughness:0.25});
+  const accentMat = makeMat(0xff2ed1, {metalness:0.5, roughness:0.3, emissive:0xff2ed1, emissiveIntensity:0.4});
+  const body = new THREE.Mesh(new THREE.BoxGeometry(14,4,22,3,3,3), bodyMat);
+  g.add(body);
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(3,10,8,0,Math.PI*2,0,Math.PI*0.55), new THREE.MeshStandardMaterial({color:0x1a0a1a, metalness:0.9, roughness:0.1, transparent:true, opacity:0.85}));
+  cockpit.position.set(0,2.2,-3);
+  g.add(cockpit);
+  for(let i=-1;i<=1;i+=2){
+    const fin = new THREE.Mesh(new THREE.BoxGeometry(1,1.2,10), accentMat);
+    fin.position.set(i*7.2, 0, 2);
+    g.add(fin);
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(1,3,4), accentMat);
+    spike.position.set(i*7.2, 1.2, 10);
+    spike.rotation.x = Math.PI/2;
+    g.add(spike);
+  }
+  const eyeGeo = new THREE.SphereGeometry(0.5,6,6);
+  const eyeMat = new THREE.MeshBasicMaterial({color:0xff2ed1});
+  for(let i=-1;i<=1;i+=2){
+    const eye = new THREE.Mesh(eyeGeo, eyeMat);
+    eye.position.set(i*2.5, 1, -10.5);
+    g.add(eye);
+  }
+  const light = new THREE.PointLight(0xff2ed1, 2, 60);
+  light.position.set(0,0,-5);
+  g.add(light);
+  g.userData.isBoss = true;
+  return g;
+}
+
+// ============================================================
+// LEVEL / DIFFICULTY
+// ============================================================
+function levelConfig(level){
+  return {
+    enemyCount: Math.min(6 + level*2, 40),
+    ownSpeedFactor: Math.max(0.18, 0.6 - level*0.018), // makin tinggi level, NPC relatif makin "diam" -> makin cepat didekati
+    enemyHP: 1 + Math.floor(Math.max(0,level-8)/8),
+    maxConcurrent: Math.min(3 + Math.floor(level/3), 8),
+    spawnInterval: Math.max(0.35, 1.3 - level*0.045),
+  };
+}
+
+function startLevel(level){
+  const cfg = levelConfig(level);
+  state.enemiesTotal = cfg.enemyCount;
+  state.enemiesSpawned = 0;
+  state.enemiesDestroyed = 0;
+  state.enemiesEscaped = 0;
+  state.spawnTimer = 0;
+  state.currentCfg = cfg;
+  state.forwardSpeed = 24 * state.car.speed + level*0.5;
+  laneXIndex = 2; laneYIndex = 1;
+  document.getElementById('bossHud').classList.add('hidden');
+  state.bossActive = false;
+
+  if(level === 20){
+    startBossLevel();
+  } else {
+    showCenterMsg(`LEVEL ${level}`, 1600);
+  }
+  updateHUD();
+}
+
+function startBossLevel(){
+  state.bossActive = true;
+  boss = buildBoss();
+  boss.position.set(0, 26, -80);
+  boss.userData.hp = 400 + state.level*10;
+  boss.userData.maxHp = boss.userData.hp;
+  boss.userData.phaseTimer = 0;
+  boss.userData.fireTimer = 0;
+  scene.add(boss);
+  document.getElementById('bossHud').classList.remove('hidden');
+  updateBossHUD();
+  showCenterMsg('⚠ BOSS INCOMING ⚠', 2200);
+}
+
+function spawnEnemy(){
+  const cfg = state.currentCfg;
+  const enemy = buildTrafficCar();
+  const laneXi = Math.floor(Math.random()*LANES_X.length);
+  const laneYi = Math.floor(Math.random()*LANES_Y.length);
+  const x = LANES_X[laneXi] + (Math.random()-0.5)*2;
+  const y = LANES_Y[laneYi] + (Math.random()-0.5)*2;
+  const z = -(210 + Math.random()*90);
+  enemy.position.set(x, y, z);
+  enemy.rotation.y = 0; // menghadap arah yang sama dengan player (maju)
+  enemy.userData.ownSpeed = state.forwardSpeed * cfg.ownSpeedFactor * (0.85+Math.random()*0.3);
+  enemy.userData.hp = cfg.enemyHP;
+  enemy.userData.maxHp = cfg.enemyHP;
+  scene.add(enemy);
+  enemies.push(enemy);
+  state.enemiesSpawned++;
+}
+
+// ============================================================
+// INPUT
+// ============================================================
+window.addEventListener('keydown', e=>{
+  const k = e.key.toLowerCase();
+  if(k==='p') togglePause(!state.paused);
+  if(e.key===' ') { e.preventDefault(); manualShoot(); }
+  if(k==='a'||k==='arrowleft') shiftLaneX(-1);
+  if(k==='d'||k==='arrowright') shiftLaneX(1);
+  if(k==='w'||k==='arrowup') shiftLaneY(1);
+  if(k==='s'||k==='arrowdown') shiftLaneY(-1);
+});
+
+function shiftLaneX(dir){
+  if(!state.running || state.paused || laneChangeCooldown>0) return;
+  laneXIndex = THREE.MathUtils.clamp(laneXIndex+dir, 0, LANES_X.length-1);
+  laneChangeCooldown = 0.16;
+}
+function shiftLaneY(dir){
+  if(!state.running || state.paused || laneChangeCooldown>0) return;
+  laneYIndex = THREE.MathUtils.clamp(laneYIndex+dir, 0, LANES_Y.length-1);
+  laneChangeCooldown = 0.16;
+}
+
+['btnLeft','btnRight','btnUp','btnDown'].forEach(id=>{
+  const el = document.getElementById(id);
+  el.addEventListener('pointerdown', e=>{
+    e.preventDefault();
+    if(id==='btnLeft') shiftLaneX(-1);
+    if(id==='btnRight') shiftLaneX(1);
+    if(id==='btnUp') shiftLaneY(1);
+    if(id==='btnDown') shiftLaneY(-1);
+  });
+});
+
+// tombol tembak mobile — tekan & tahan untuk tembak beruntun
+let fireHoldInterval = null;
+const fireBtnEl = document.getElementById('fireBtn');
+fireBtnEl.addEventListener('pointerdown', e=>{
+  e.preventDefault();
+  manualShoot();
+  clearInterval(fireHoldInterval);
+  fireHoldInterval = setInterval(manualShoot, 60);
+});
+['pointerup','pointerleave','pointercancel'].forEach(evt=>{
+  fireBtnEl.addEventListener(evt, ()=>{ clearInterval(fireHoldInterval); fireHoldInterval=null; });
+});
+window.addEventListener('resize', ()=>{
+  if(!camera||!renderer) return;
+  camera.aspect = window.innerWidth/window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function togglePause(p){
+  if(!state.running && p) return;
+  state.paused = p;
+  document.getElementById('pauseScreen').classList.toggle('hidden', !p);
+}
+
+// ============================================================
+// SHOOTING — auto-fire saat player sejajar (satu lajur) dengan NPC di depan
+// ============================================================
+const ALIGN_TOL_X = 4.2, ALIGN_TOL_Y = 4.2, MAX_RANGE = 260;
+
+function findAlignedTarget(){
+  if(!playerShip) return null;
+  if(state.bossActive){
+    return boss ? {position: boss.position} : null;
+  }
+  let best = null, bestZ = -Infinity;
+  for(const en of enemies){
+    const dz = en.position.z - playerShip.position.z;
+    if(dz < -4 && dz > -MAX_RANGE){
+      if(Math.abs(en.position.x-playerShip.position.x) < ALIGN_TOL_X &&
+         Math.abs(en.position.y-playerShip.position.y) < ALIGN_TOL_Y){
+        if(en.position.z > bestZ){ bestZ = en.position.z; best = en; }
+      }
+    }
+  }
+  return best;
+}
+
+function fireAt(targetPos){
+  const from = playerShip.position.clone().add(new THREE.Vector3(0,0.3,-1));
+  const dir = targetPos.clone().sub(from).normalize();
+  const geo = new THREE.SphereGeometry(0.35, 6, 6);
+  const mat = new THREE.MeshBasicMaterial({color: state.car.glow});
+  const bolt = new THREE.Mesh(geo, mat);
+  bolt.position.copy(from);
+  bolt.userData.dir = dir;
+  bolt.userData.life = 3;
+  const pLight = new THREE.PointLight(state.car.glow, 0.8, 8);
+  bolt.add(pLight);
+  scene.add(bolt);
+  projectiles.push(bolt);
+}
+
+function updateAutoFire(){
+  if(!state.running || state.paused || !playerShip) return;
+  const target = findAlignedTarget();
+  const cross = document.getElementById('crosshair');
+  cross.classList.toggle('locked', !!target);
+  if(!target) return;
+  const now = performance.now();
+  if(now - lastShotTime < state.car.fireRate) return;
+  lastShotTime = now;
+  fireAt(target.position);
+}
+
+function manualShoot(){
+  if(!state.running || state.paused || !playerShip) return;
+  const now = performance.now();
+  if(now - lastShotTime < state.car.fireRate) return;
+  const target = findAlignedTarget();
+  lastShotTime = now;
+  const aimPos = target ? target.position : playerShip.position.clone().add(new THREE.Vector3(0,0,-100));
+  fireAt(aimPos);
+}
+
+function enemyShoot(source, targetPos){
+  const geo = new THREE.SphereGeometry(0.4,6,6);
+  const mat = new THREE.MeshBasicMaterial({color:0xff2ed1});
+  const bolt = new THREE.Mesh(geo, mat);
+  bolt.position.copy(source);
+  const dir = targetPos.clone().sub(source).normalize();
+  bolt.userData.dir = dir;
+  bolt.userData.life = 5;
+  scene.add(bolt);
+  enemyProjectiles.push(bolt);
+}
+
+// ============================================================
+// HUD
+// ============================================================
+function updateHUD(){
+  document.getElementById('hudLevel').textContent = 'LV '+state.level;
+  document.getElementById('hudScore').textContent = state.score;
+  document.getElementById('hudHpText').textContent = Math.max(0,Math.round(state.hp))+'/'+state.maxHp;
+  document.getElementById('hudHpBar').style.width = Math.max(0,(state.hp/state.maxHp*100))+'%';
+  if(state.bossActive){
+    document.getElementById('hudEnemies').textContent = 'Boss Fight!';
+  } else {
+    document.getElementById('hudEnemies').textContent = `Traffic: ${state.enemiesDestroyed+state.enemiesEscaped} / ${state.enemiesTotal}`;
+  }
+}
+function updateBossHUD(){
+  if(!boss) return;
+  const pct = Math.max(0, boss.userData.hp/boss.userData.maxHp*100);
+  document.getElementById('bossBar').style.width = pct+'%';
+}
+
+let msgTimer=null;
+function showCenterMsg(text, duration){
+  const el = document.getElementById('centerMsg');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(()=> el.classList.remove('show'), duration);
+}
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+function animate(){
+  if(!state.running) return;
+  requestAnimationFrame(animate);
+  const delta = Math.min(clock.getDelta(), 0.05);
+  if(state.paused) { renderer.render(scene,camera); return; }
+
+  updatePlayer(delta);
+  updateWorldScroll(delta);
+  updateProjectiles(delta);
+  if(state.bossActive){
+    updateBoss(delta);
+  } else {
+    updateEnemySpawning(delta);
+    updateEnemies(delta);
+  }
+  updateAutoFire();
+  updateCamera(delta);
+
+  renderer.render(scene, camera);
+}
+
+function updatePlayer(delta){
+  if(laneChangeCooldown>0) laneChangeCooldown -= delta;
+
+  const targetX = LANES_X[laneXIndex];
+  const targetY = LANES_Y[laneYIndex];
+  const prevX = playerShip.position.x;
+  playerShip.position.x += (targetX - playerShip.position.x)*Math.min(1,delta*7);
+  playerShip.position.y += (targetY - playerShip.position.y)*Math.min(1,delta*5);
+
+  const bank = (targetX - playerShip.position.x);
+  playerShip.rotation.z = THREE.MathUtils.clamp(-bank*0.1, -0.55, 0.55);
+  const swerve = playerShip.position.x - prevX;
+  playerShip.rotation.x = THREE.MathUtils.clamp(-swerve*0.4, -0.2, 0.2);
+
+  // dorongan maju otomatis (mobil terus melaju mengikuti lajur)
+  state.distanceTravelled = (state.distanceTravelled||0) + state.forwardSpeed*delta;
+}
+
+function updateCamera(delta){
+  const targetPos = new THREE.Vector3(
+    playerShip.position.x*0.6,
+    playerShip.position.y + 6,
+    playerShip.position.z + 24
+  );
+  camera.position.lerp(targetPos, Math.min(1, delta*4));
+  const lookTarget = playerShip.position.clone().add(new THREE.Vector3(0, 1, -40));
+  camera.lookAt(lookTarget);
+}
+
+function updateWorldScroll(delta){
+  const spd = state.forwardSpeed;
+  for(const b of buildingPool){
+    b.position.z += spd*delta;
+    if(b.position.z > RECYCLE_BEHIND){
+      b.position.z -= 340;
+      const side = Math.random()<0.5?-1:1;
+      b.position.x = side*(24 + Math.random()*140);
+    }
+  }
+  for(const m of laneMarkers){
+    m.position.z += spd*delta;
+    if(m.position.z > RECYCLE_BEHIND) m.position.z -= 340;
+  }
+}
+
+function updateProjectiles(delta){
+  const speed = 130;
+  for(let i=projectiles.length-1;i>=0;i--){
+    const p = projectiles[i];
+    p.position.addScaledVector(p.userData.dir, speed*delta);
+    p.userData.life -= delta;
+    let hit = false;
+
+    // vs enemies
+    for(let j=enemies.length-1;j>=0;j--){
+      const en = enemies[j];
+      if(p.position.distanceTo(en.position) < 2.6){
+        en.userData.hp -= state.car.damage;
+        hit = true;
+        if(en.userData.hp<=0){
+          scene.remove(en);
+          enemies.splice(j,1);
+          state.enemiesDestroyed++;
+          state.score += 15*state.level;
+          spawnExplosion(en.position, 0xffcf4d);
+        }
+        break;
+      }
+    }
+    // vs boss
+    if(!hit && boss && p.position.distanceTo(boss.position) < 11){
+      boss.userData.hp -= state.car.damage*2;
+      hit = true;
+      spawnExplosion(p.position, 0xff2ed1);
+      updateBossHUD();
+      if(boss.userData.hp<=0){
+        onBossDefeated();
+      }
+    }
+
+    if(hit || p.userData.life<=0 || p.position.length()>500){
+      scene.remove(p);
+      projectiles.splice(i,1);
+    }
+  }
+
+  for(let i=enemyProjectiles.length-1;i>=0;i--){
+    const p = enemyProjectiles[i];
+    p.position.addScaledVector(p.userData.dir, 55*delta);
+    p.userData.life -= delta;
+    let hit=false;
+    if(p.position.distanceTo(playerShip.position) < 2.4){
+      hit = true;
+      damagePlayer(state.bossActive?14:8);
+      spawnExplosion(p.position, 0xff3355);
+    }
+    if(hit || p.userData.life<=0){
+      scene.remove(p);
+      enemyProjectiles.splice(i,1);
+    }
+  }
+  updateHUD();
+}
+
+function spawnExplosion(pos,color){
+  const geo = new THREE.SphereGeometry(0.6,6,6);
+  const mat = new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.9});
+  const m = new THREE.Mesh(geo,mat);
+  m.position.copy(pos);
+  scene.add(m);
+  let t=0;
+  const animExplo = ()=>{
+    t+=0.05;
+    m.scale.setScalar(1+t*6);
+    m.material.opacity = Math.max(0,0.9-t*2);
+    if(t<0.5) requestAnimationFrame(animExplo);
+    else scene.remove(m);
+  };
+  animExplo();
+}
+
+function updateEnemySpawning(delta){
+  state.spawnTimer -= delta;
+  if(state.spawnTimer<=0 && state.enemiesSpawned < state.enemiesTotal && enemies.length < state.currentCfg.maxConcurrent){
+    spawnEnemy();
+    state.spawnTimer = state.currentCfg.spawnInterval;
+  }
+  if(state.enemiesSpawned >= state.enemiesTotal && enemies.length===0){
+    onLevelComplete();
+  }
+}
+
+function updateEnemies(delta){
+  for(let i=enemies.length-1;i>=0;i--){
+    const en = enemies[i];
+    // NPC melaju maju di lajurnya sendiri; player mendekat karena forwardSpeed lebih cepat
+    en.position.z += (state.forwardSpeed - en.userData.ownSpeed) * delta;
+
+    // tertabrak player (lewat tanpa sempat ditembak & sejajar posisinya)
+    if(en.position.distanceTo(playerShip.position) < 3.4){
+      damagePlayer(12);
+      spawnExplosion(en.position, 0xff3355);
+      scene.remove(en);
+      enemies.splice(i,1);
+      state.enemiesEscaped++;
+      continue;
+    }
+    // lolos melewati player tanpa ditembak
+    if(en.position.z > playerShip.position.z + 12){
+      scene.remove(en);
+      enemies.splice(i,1);
+      state.enemiesEscaped++;
+    }
+  }
+}
+
+function updateBoss(delta){
+  if(!boss) return;
+  boss.userData.phaseTimer += delta;
+  boss.userData.fireTimer += delta;
+  const t = boss.userData.phaseTimer;
+  boss.position.x = Math.sin(t*0.35)*26;
+  boss.position.y = 24 + Math.sin(t*0.6)*6;
+  boss.position.z = THREE.MathUtils.lerp(boss.position.z, -55, Math.min(1,delta*0.5));
+  boss.rotation.y = Math.sin(t*0.35)*0.3;
+
+  if(boss.userData.fireTimer > Math.max(0.5, 1.4 - state.level*0.02)){
+    boss.userData.fireTimer = 0;
+    const muzzle = boss.position.clone().add(new THREE.Vector3((Math.random()-0.5)*10, -1, 10));
+    enemyShoot(muzzle, playerShip.position.clone());
+  }
+  updateBossHUD();
+}
+
+function damagePlayer(amount){
+  state.hp -= amount;
+  updateHUD();
+  if(state.hp<=0 && state.running){
+    onGameOver();
+  }
+}
+
+// ============================================================
+// LEVEL FLOW
+// ============================================================
+function onLevelComplete(){
+  if(!state.running) return;
+  state.running = false;
+  showCenterMsg('LEVEL SELESAI!', 1400);
+  setTimeout(()=>{
+    // guard: kalau pemain sudah keluar ke menu/game over selama jeda ini, jangan lanjutkan
+    if(!scene || !playerShip) return;
+    if(state.level >= 19 && state.level < 20){
+      state.level = 20;
+    } else {
+      state.level++;
+    }
+    state.running = true;
+    clock.getDelta(); // buang delta besar akibat jeda setTimeout supaya tidak ada lompatan gerak
+    startLevel(state.level);
+    animate(); // WAJIB: restart game loop, karena animate() berhenti total saat state.running=false
+  }, 1500);
+}
+
+function onBossDefeated(){
+  state.running = false;
+  state.score += 2000;
+  scene.remove(boss);
+  boss = null;
+  document.getElementById('winScore').textContent = state.score;
+  setTimeout(()=> show('victoryScreen'), 800);
+}
+
+function onGameOver(){
+  state.running = false;
+  document.getElementById('overLevel').textContent = state.level;
+  document.getElementById('overScore').textContent = state.score;
+  setTimeout(()=> show('gameOverScreen'), 400);
+}
+
+</script>
+</body>
+</html>
